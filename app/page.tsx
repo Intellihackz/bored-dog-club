@@ -115,30 +115,50 @@ function MiniGame() {
   const [playerPosition, setPlayerPosition] = useState(50)
   const [bones, setBones] = useState<{id: number, x: number, y: number}[]>([])
   const [lastCatch, setLastCatch] = useState<{x: number, y: number, time: number} | null>(null)
+  const [isMovingLeft, setIsMovingLeft] = useState(false)
+  const [isMovingRight, setIsMovingRight] = useState(false)
 
-  // Handle keyboard controls
+  // Handle keyboard controls for desktop
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'ArrowLeft') {
-        setPlayerPosition(prev => Math.max(0, prev - 3))
+        setIsMovingLeft(true)
       } else if (e.key === 'ArrowRight') {
-        setPlayerPosition(prev => Math.min(90, prev + 3))
+        setIsMovingRight(true)
+      }
+    }
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') {
+        setIsMovingLeft(false)
+      } else if (e.key === 'ArrowRight') {
+        setIsMovingRight(false)
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
+    window.addEventListener('keyup', handleKeyUp)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('keyup', handleKeyUp)
+    }
   }, [])
 
-  // Handle touch controls with smoother movement
-  const handleTouchMove = (e: React.TouchEvent) => {
-    e.preventDefault() // Prevent screen drag
-    const touch = e.touches[0]
-    const rect = e.currentTarget.getBoundingClientRect()
-    const x = touch.clientX - rect.left
-    const percentage = (x / rect.width) * 100
-    setPlayerPosition(Math.max(0, Math.min(90, percentage)))
-  }
+  // Handle continuous movement
+  useEffect(() => {
+    if (!isMovingLeft && !isMovingRight) return
+
+    const moveInterval = setInterval(() => {
+      if (isMovingLeft) {
+        setPlayerPosition(prev => Math.max(0, prev - 3))
+      }
+      if (isMovingRight) {
+        setPlayerPosition(prev => Math.min(90, prev + 3))
+      }
+    }, 16)
+
+    return () => clearInterval(moveInterval)
+  }, [isMovingLeft, isMovingRight])
 
   useEffect(() => {
     const gameLoop = setInterval(() => {
@@ -174,15 +194,13 @@ function MiniGame() {
   }, [playerPosition])
 
   return (
-    <div 
-      className="relative h-full w-full bg-black touch-none select-none"
-      onTouchMove={handleTouchMove}
-    >
+    <div className="relative h-full w-full bg-black touch-none select-none">
       <div className="absolute top-4 left-4 text-3xl font-bold">Score: {score}</div>
       
-      {/* Mobile Controls Hint */}
-      <div className="absolute top-4 right-4 text-sm opacity-50 md:hidden">
-        Slide finger to move
+      {/* Responsive Controls Instructions */}
+      <div className="absolute top-4 right-4 text-sm opacity-50">
+        <span className="hidden md:block">Use ← → arrow keys to move</span>
+        <span className="md:hidden">Use buttons below to move</span>
       </div>
       
       {/* Score Animation */}
@@ -198,9 +216,46 @@ function MiniGame() {
         </div>
       )}
       
+      {/* Mobile-only On-screen Controls */}
+      <div className="md:hidden absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-6">
+        <button
+          className="w-14 h-14 bg-white bg-opacity-10 rounded-full flex items-center justify-center
+                     active:bg-opacity-20 transition-all duration-150 select-none touch-none"
+          onTouchStart={(e) => {
+            e.preventDefault()
+            setIsMovingLeft(true)
+          }}
+          onTouchEnd={(e) => {
+            e.preventDefault()
+            setIsMovingLeft(false)
+          }}
+        >
+          <svg className="w-8 h-8 text-white pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+
+        <button
+          className="w-14 h-14 bg-white bg-opacity-10 rounded-full flex items-center justify-center
+                     active:bg-opacity-20 transition-all duration-150 select-none touch-none"
+          onTouchStart={(e) => {
+            e.preventDefault()
+            setIsMovingRight(true)
+          }}
+          onTouchEnd={(e) => {
+            e.preventDefault()
+            setIsMovingRight(false)
+          }}
+        >
+          <svg className="w-8 h-8 text-white pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      </div>
+      
       {/* Player */}
       <div 
-        className="absolute bottom-0 w-20 h-20 transition-all duration-75 ease-out"
+        className="absolute bottom-24 md:bottom-16 w-20 h-20 transition-all duration-75 ease-out"
         style={{ left: `${playerPosition}%`, transform: 'translateX(-50%)' }}
       >
         <Image
